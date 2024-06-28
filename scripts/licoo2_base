@@ -1,0 +1,36 @@
+&CONTROL
+  calculation = 'scf',
+  outdir = 'TMP',
+  prefix = 'LCO',
+  tstress = .true., tprnfor = .true
+  pseudo_dir = '/home/lucas/Desktop/pslibrary.1.0.0/pbesol/PSEUDOPOTENTIALS' 
+/
+&SYSTEM
+  ibrav = 0
+  A =    2.81126
+  nat = 4
+  ntyp = 3
+  ecutwfc = <ecutwfc>
+  ecutrho = <ecutrho>
+  
+/
+&ELECTRONS
+  mixing_mode = 'local-TF'
+  electron_maxstep = 200, mixing_beta = 0.5
+/
+CELL_PARAMETERS {alat}
+  0.577350269189626   0.000000000000000   1.649257079538373 
+ -0.288675134594813   0.500000000000000   1.649257079538373 
+ -0.288675134594813  -0.500000000000000   1.649257079538373 
+ATOMIC_SPECIES
+  Li    6.96750   Li.pbesol-sl-rrkjus_psl.1.0.0.UPF
+  Co   58.93300  Co.pbesol-n-rrkjus_psl.1.0.0.UPF
+   O   15.99900   O.pbesol-n-rrkjus_psl.1.0.0.UPF
+ATOMIC_POSITIONS {crystal}
+Co   0.500000000000000   0.500000000000000   0.500000000000000 
+ O   0.240006800000000   0.240006800000000   0.240006800000000 
+ O   0.759993200000000   0.759993200000000   0.759993200000000 
+Li   0.000000000000000   0.000000000000000   0.000000000000000
+K_POINTS automatic
+<K1> <K2> <K2> 0 0 0
+
