@@ -41,7 +41,10 @@ elif [ "$part" -eq 2 ]; then
         sed "s/<K2>/${j}/g" tmp.in > ${in_out}_k${j}.in
         mpirun -np 8 pw.x -in ${in_out}_k${j}.in > ${in_out}_k${j}.out
     done
-elif [ "$part" -eq 3 ]; then
+else 
+    echo "Invalid input. Please enter 1, 2 or 3."
+fi
+if [ "$part" -eq 3 ]; then
     echo "Running automatically k point sampling, choosing large ecutwfc..."
     ecut=90
     ecut2=$(echo "${ecut}*12" | bc -l)
