@@ -1,94 +1,89 @@
-# script that takes vc relax calculation and generates POSCAR file
-import subprocess
-import numpy as np
 import sys
+import pandas as pd
 
-bohr_to_angs=0.529177
+bohr_to_angs = 0.529177
 
-def remove_empty(lista):
-    clean = list(filter(lambda x: x != '',lista.split(" ")))
-    return clean
+def get_last_cell_parameters(filename):
+    with open(filename, 'r') as file:
+        content = file.readlines()
 
-def count_atoms(atomic_positions):
-    atom_dict = {}
-    for line in atomic_positions:
-        atom = line.split(" ")[0]
-        if atom in atom_dict:
-            atom_dict[atom] += 1
-        else:
-            atom_dict[atom] = 1
-    return atom_dict 
+    vecs = []
+    rows = []
+    read_section = False
 
-def extract_alat(s):
-    words = s.split()
-    number = words[-1][:-1] # remove last trailing parenthesis
-    return float(number)*bohr_to_angs
+    for i, line in enumerate(content):
+        # Detect the start of the final geometry
+        if "Begin final coordinates" in line:
+            read_section = True
+            vecs = []  # Reset vecs for the new section
+            rows = []  # Reset rows for the new section
+            continue
+        elif "End final coordinates" in line:
+            read_section = False
+            break 
 
-def grep_in_file(pattern, filename):
-    try:
-        output = subprocess.check_output(["grep", "-A 13", pattern, filename])
-        process_grep(output=output.decode("utf-8"))
-#        return output.decode("utf-8")
-    except subprocess.CalledProcessError:
-        return ""
+        if read_section:
+            if "CELL_PARAMETERS (angstrom)" in line:
+                vecs = [
+                    [float(x) for x in content[i + 1].split()],
+                    [float(x) for x in content[i + 2].split()],
+                    [float(x) for x in content[i + 3].split()]
+                ]
+                continue
+            if "ATOMIC_POSITIONS (angstrom)" in line:
+                for pos_line in content[i + 1:]:
+                    if pos_line.strip() == "" or "End final coordinates" in pos_line:
+                        break
+                    parts = pos_line.split()
+                    if len(parts) == 4:
+                        rows.append({
+                            'atom': parts[0],
+                            'x': float(parts[1]),
+                            'y': float(parts[2]),
+                            'z': float(parts[3])
+                        })
+    atom_df = pd.DataFrame(rows)
+    return vecs, atom_df
+
+
+
+def generate_poscar(vecs, atom_df):
+    write_string = f"Generated from QE - {sys.argv[1]} vc relax \n"
+    write_string += "1.0\n"  # scaling factor
+    for row in vecs:
+        write_string += "   ".join(f"{value:.10f}" for value in row) + "\n"
     
-def process_grep(output):
-    lines = output.split('\n')
-    #print(lines)
-    for i in range(len(lines)):
-        if "CELL_PARAMETERS" in lines[i]:
-           # print(lines[i+1].split(" "))
-            vec1 = [float(line) for line in remove_empty(lines[i+1])]
-            vec2 = [float(line) for line in remove_empty(lines[i+2])]
-            vec3 = [float(line) for line in remove_empty(lines[i+3])]
-            alat = extract_alat(lines[i])
-            lattice_vectors = np.array([vec1,vec2,vec3])
-            scaled_vectors = alat*lattice_vectors
-        if "ATOMIC_POSITIONS (crystal)" in lines[i]:
-            atomic_positions = list(lines[i+1:-1])
-           # print(atomic_positions)
-         #   print(atomic_positions)
-   # print(type(atomic_positions))
-    generate_poscar(scaled_vectors,atomic_positions)
+    unique_atoms = set(i for i in atom_df['atom'])
+    print(unique_atoms)
+    write_string += "   ".join(unique_atoms) + "\n"
+    counts = [len(atom_df.query(f" atom == '{i}' ")) for i in unique_atoms]
+    print(counts)
+    for i in counts:
+        write_string += str(i) + " "
+    write_string += "\n"        
+    
+    write_string += "Cartesian\n" # if "crystal" coords, then Direct
+    for atom in unique_atoms:
+        unique = atom_df.query(f"atom == '{atom}'")
+        for _, row in unique.iterrows():
+            write_string += "   ".join(f"{row[col]:.10f}" for col in ['x', 'y', 'z']) + "\n"
 
-def generate_poscar(scaled_vectors,atomic_positions):
-    write_string = "POSCAR generated from QE output file \n"
-    write_string += "1.0" # scaling factor
-    write_string += "\n"
-    for row in scaled_vectors:
-        for value in row:
-            write_string += f"        {value:.10f}          "
-        write_string += "\n"
-    atom_dict =  count_atoms(atomic_positions=atomic_positions)
-    for atom in atom_dict.keys():
-        write_string += f"   {atom}   "
-    write_string += "\n"
-    for _,value in atom_dict.items():
-        write_string += f"  {value}  "
-    write_string += "\n"
-    write_string += "Direct"
-    write_string += "\n"
-    for line in atomic_positions:
-        processed_line = line.split(' ')
-        processed_line = [item for item in processed_line if item not in atom_dict.keys()]    
-        write_string += ' '.join(processed_line)
-        write_string += "\n"
-    with open("POSCAR",'w') as f:
+    with open("POSCAR", 'w') as f:
         f.write(write_string)
 
 def main():
     if len(sys.argv) < 2:
-        print("wrong # arg")
+        print("Error: Please provide the output file as an argument.")
         return
-    grep_in_file("Begin final coordinates",sys.argv[1])
     
+    scaled_vectors, atomic_positions = get_last_cell_parameters(sys.argv[1])
+    
+    if scaled_vectors is not None and atomic_positions is not None:
+        generate_poscar(scaled_vectors, atomic_positions)
+        print("POSCAR file generated successfully.")
+    else:
+        print("Error: Couldn't process the output file.")
+
 if __name__ == '__main__':
-    main()    
-
-
-
-
-
-
-
+    main()
 
